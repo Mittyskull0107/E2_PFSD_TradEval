@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>TradeEval Simulator</title>
+</head>
+
+<body>
+
+<h2>TradeEval Simulator</h2>
+
+<input id="symbol" placeholder="Stock Symbol">
+
+<select id="strategy">
+<option>moving_average</option>
+<option>momentum</option>
+</select>
+
+<button onclick="runBacktest()">Run Strategy</button>
+
+<h3>Results</h3>
+
+<div id="result"></div>
+
+<script>
+
+async function runBacktest(){
+
+let symbol=document.getElementById("symbol").value
+let strategy=document.getElementById("strategy").value
+
+let response=await fetch("http://127.0.0.1:8000/api/backtest/",{
+
+method:"POST",
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({
+symbol:symbol,
+strategy:strategy
+})
+
+})
+
+let data=await response.json()
+
+document.getElementById("result").innerHTML=
+JSON.stringify(data,null,2)
+
+}
+
+</script>
+
+</body>
+</html>
