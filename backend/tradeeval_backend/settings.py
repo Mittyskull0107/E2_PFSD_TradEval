@@ -1,5 +1,8 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -11,6 +14,7 @@ SECRET_KEY = os.environ.get(
 # Keep DEBUG=True for local development
 # On Render, set environment variable DJANGO_DEBUG=False
 DEBUG = os.environ.get("DJANGO_DEBUG", "True") != "False"
+NEWSAPI_KEY = os.environ.get("NEWSAPI_KEY", "")
 
 ALLOWED_HOSTS = [
     "localhost",
