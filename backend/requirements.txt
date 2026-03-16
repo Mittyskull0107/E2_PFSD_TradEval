@@ -1,9 +1,13 @@
 Django
 gunicorn
 pymongo
+djongo
 django-cors-headers
 yfinance
 pandas
 numpy
 scikit-learn
 joblib
+textblob
+requests
+python-dotenv
