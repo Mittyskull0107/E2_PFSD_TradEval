@@ -2,9 +2,10 @@ import joblib
 import numpy as np
 from pathlib import Path
 
-BASE_DIR   = Path(__file__).resolve().parents[3]
-MODEL_PATH = BASE_DIR / "ml" / "model" / "risk_classifier.pkl"
+BASE_DIR    = Path(__file__).resolve().parents[3]
+MODEL_PATH  = BASE_DIR / "ml" / "model" / "risk_classifier.pkl"
 SCALER_PATH = BASE_DIR / "ml" / "model" / "scaler.pkl"
+META_PATH   = BASE_DIR / "ml" / "model" / "model_metadata.json""scaler.pkl"
 
 # ── what features this model expects (document clearly) ───────────
 FEATURE_NAMES = [
@@ -50,7 +51,14 @@ def _get_scaler():
     if _scaler is None:
         _scaler = _load_artifact(SCALER_PATH, "scaler")
     return _scaler
-
+    
+def get_model_info() -> dict:
+    """Return metadata about the loaded model."""
+    import json
+    if META_PATH.exists():
+        with open(META_PATH) as f:
+            return json.load(f)
+    return {"note": "No metadata found. Run: cd ml && python train_model.py"}
 
 def classify_risk(features: list) -> dict:
     """
@@ -97,9 +105,11 @@ def classify_risk(features: list) -> dict:
         }
 
     # ── apply scaler if available ─────────────────────────────────
-    scaler = _get_scaler()
+   scaler = _get_scaler()
     if scaler is not None:
         features_array = scaler.transform(features_array)
+    else:
+        print("[risk_model] WARNING: No scaler found — predictions may be inaccurate")
 
     # ── predict ───────────────────────────────────────────────────
     try:
