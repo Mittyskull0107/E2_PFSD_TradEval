@@ -1,6 +1,6 @@
-import yfinance as yf
-from textblob import TextBlob
 import numpy as np
+import yfinance as yf
+from .news_fetcher import fetch_news
 
 def analyze_event(symbol: str) -> dict:
 
@@ -9,94 +9,72 @@ def analyze_event(symbol: str) -> dict:
 
     symbol = symbol.upper().strip()
 
+    # ── 1. PRICE HISTORY ─────────────────────────────────────────
     try:
         ticker = yf.Ticker(symbol)
-
-        # ── 1. HISTORICAL PRICE DATA ──────────────────────────────
-        hist = ticker.history(period="3mo")
+        hist   = ticker.history(period="3mo")
 
         if hist.empty:
-            return {"error": f"No historical data found for {symbol}"}
+            return {"error": f"No price data found for {symbol}"}
 
-        prices     = hist["Close"].tolist()
-        returns    = np.diff(prices) / prices[:-1]          # daily % returns
-        volatility = round(float(np.std(returns) * 100), 2) # as percentage
-
-        # ── 2. NEWS + SENTIMENT ───────────────────────────────────
-        raw_news = ticker.news or []
-        analyzed_news = []
-
-        for article in raw_news[:5]:
-            title    = article.get("title", "")
-            link     = article.get("link", "")
-            provider = article.get("publisher", "Unknown")
-
-            # TextBlob sentiment: polarity -1.0 (negative) to +1.0 (positive)
-            sentiment_score = round(TextBlob(title).sentiment.polarity, 3)
-
-            if sentiment_score > 0.1:
-                sentiment_label = "positive"
-            elif sentiment_score < -0.1:
-                sentiment_label = "negative"
-            else:
-                sentiment_label = "neutral"
-
-            analyzed_news.append({
-                "title":           title,
-                "link":            link,
-                "publisher":       provider,
-                "sentiment_score": sentiment_score,
-                "sentiment":       sentiment_label,
-            })
-
-        # ── 3. OVERALL SENTIMENT SIGNAL ───────────────────────────
-        if analyzed_news:
-            avg_score = round(
-                sum(n["sentiment_score"] for n in analyzed_news) / len(analyzed_news), 3
-            )
-        else:
-            avg_score = 0.0
-
-        if avg_score > 0.1:
-            overall_signal = "bullish"
-        elif avg_score < -0.1:
-            overall_signal = "bearish"
-        else:
-            overall_signal = "neutral"
-
-        # ── 4. EARNINGS CALENDAR ──────────────────────────────────
-        earnings_info = {}
-        try:
-            cal = ticker.calendar
-            if cal is not None and not cal.empty:
-                earnings_info = {
-                    col: str(cal[col].iloc[0])
-                    for col in cal.columns
-                    if not cal[col].isnull().all()
-                }
-        except Exception:
-            earnings_info = {"note": "No earnings calendar available"}
-
-        # ── 5. BEHAVIOR SUMMARY ───────────────────────────────────
-        recent_return = round(
-            ((prices[-1] - prices[0]) / prices[0]) * 100, 2
-        )
-
-        return {
-            "symbol":           symbol,
-            "volatility_pct":   volatility,
-            "recent_return_pct": recent_return,
-            "overall_signal":   overall_signal,
-            "avg_sentiment_score": avg_score,
-            "news":             analyzed_news,
-            "earnings_calendar": earnings_info,
-            "behavior_summary": (
-                f"{symbol} shows {overall_signal} sentiment based on "
-                f"{len(analyzed_news)} recent news articles. "
-                f"3-month return: {recent_return}%, "
-                f"volatility: {volatility}%."
-            )
-        }
+        prices    = hist["Close"].tolist()
+        returns   = np.diff(prices) / prices[:-1]
+        volatility      = round(float(np.std(returns) * np.sqrt(252) * 100), 2)
+        recent_return   = round(((prices[-1] - prices[0]) / prices[0]) * 100, 2)
+        avg_daily_return = round(float(np.mean(returns) * 100), 4)
 
     except Exception as e:
-        return {"error": f"Analysis failed for {symbol}: {str(e)}"}
+        return {"error": f"Price data fetch failed: {str(e)}"}
+
+    # ── 2. NEWS + SENTIMENT ───────────────────────────────────────
+    news_result = fetch_news(symbol, days_back=7)
+
+    # gracefully handle news fetch failure
+    if "error" in news_result and not news_result.get("articles"):
+        news_signal = "neutral"
+        avg_sentiment = 0.0
+        news_error = news_result["error"]
+    else:
+        news_signal   = news_result.get("overall_signal", "neutral")
+        avg_sentiment = news_result.get("avg_score", 0.0)
+        news_error    = None
+
+    # ── 3. EARNINGS CALENDAR ─────────────────────────────────────
+    earnings_info = {}
+    try:
+        cal = ticker.calendar
+        if cal is not None and not cal.empty:
+            earnings_info = {
+                col: str(cal[col].iloc[0])
+                for col in cal.columns
+                if not cal[col].isnull().all()
+            }
+    except Exception:
+        earnings_info = {"note": "No earnings calendar available"}
+
+    # ── 4. COMBINED BEHAVIOR SIGNAL ──────────────────────────────
+    # blend price trend and news sentiment into one signal
+    if recent_return > 2 and news_signal == "bullish":
+        behavior = "strongly bullish"
+    elif recent_return < -2 and news_signal == "bearish":
+        behavior = "strongly bearish"
+    elif recent_return > 0 and news_signal in ("bullish", "neutral"):
+        behavior = "mildly bullish"
+    elif recent_return < 0 and news_signal in ("bearish", "neutral"):
+        behavior = "mildly bearish"
+    else:
+        behavior = "mixed / uncertain"
+
+    return {
+        "symbol":            symbol,
+        "volatility_pct":    volatility,
+        "recent_return_pct": recent_return,
+        "avg_daily_return":  avg_daily_return,
+        "news_signal":       news_signal,
+        "avg_sentiment_score": avg_sentiment,
+        "behavior_summary":  behavior,
+        "news":              news_result.get("articles", []),
+        "news_breakdown":    news_result.get("breakdown", {}),
+        "earnings_calendar": earnings_info,
+        **({"news_warning": news_error} if news_error else {}),
+    }
