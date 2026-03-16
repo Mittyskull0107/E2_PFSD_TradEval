@@ -3,9 +3,7 @@ import requests
 from datetime import datetime, timedelta
 from textblob import TextBlob
 
-NEWSAPI_KEY = os.environ.get("NEWSAPI_KEY", "")
 NEWSAPI_URL = "https://newsapi.org/v2/everything"
-
 # company name mappings for better search results
 SYMBOL_TO_COMPANY = {
     "AAPL":  "Apple",
@@ -55,6 +53,7 @@ def fetch_news(symbol: str, days_back: int = 7) -> dict:
 
     Returns a dict with analyzed articles and an overall sentiment signal.
     """
+    NEWSAPI_KEY = os.environ.get("NEWSAPI_KEY", "")
     if not NEWSAPI_KEY:
         return {
             "error": (
