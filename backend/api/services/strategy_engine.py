@@ -1,13 +1,9 @@
-from .metrics import calculate_metrics
+# strategy_engine.py
+# NOTE: The real strategy/backtest logic lives in backtester.py
+# This file exists only for backwards compatibility — do not add logic here
 
-def run_strategy(symbol, strategy):
-    # Dummy returns for now (replace later)
-    returns = [0.02, -0.01, 0.03, -0.02, 0.01]
+from .backtester import run_backtest
 
-    metrics = calculate_metrics(returns)
-
-    return {
-        "symbol": symbol,
-        "strategy": strategy,
-        "metrics": metrics
-    }
+def run_strategy(symbol: str, strategy: str) -> dict:
+    """Wrapper around run_backtest for backwards compatibility."""
+    return run_backtest(symbol, strategy)
