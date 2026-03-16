@@ -1,18 +1,7 @@
-import os
-import joblib
+# risk_api.py
+# NOTE: The real risk classification logic lives in risk_model.py
+# This file exists only for backwards compatibility — do not add logic here
 
-MODEL_PATH = os.path.join(
-    os.path.dirname(__file__),
-    "../../../ml/model/risk_classifier.pkl"
-)
+from .risk_model import classify_risk, get_model_info
 
-model = joblib.load(MODEL_PATH)
-
-def classify_risk(metrics):
-    X = [[
-        metrics["average_return"],
-        metrics["volatility"],
-        metrics["max_drawdown"],
-        metrics["sharpe_ratio"],
-    ]]
-    return model.predict(X)[0]
+__all__ = ["classify_risk", "get_model_info"]
